@@ -4,13 +4,14 @@ from flask import (
     Blueprint,
     abort,
     current_app,
+    jsonify,
     redirect,
     render_template,
     request,
     url_for,
 )
 
-from .db import connect, log_op_tx
+from .db import connect, log_op_tx, touch_last_update
 
 bp = Blueprint("laundry", __name__)
 
@@ -27,8 +28,10 @@ def home():
         running_counts = {}
         waiting_counts = {}
         startable_map = {}
+        did_mutate = False
 
         now = datetime.now()
+        server_now_ms = int(now.timestamp() * 1000)
 
         for m in machines:
             rows = c.execute(
@@ -55,15 +58,19 @@ def home():
             # maintain front_since_ts
             for w in waiting:
                 if (w["id"] in startable_ids) and (w["front_since_ts"] is None):
-                    c.execute(
+                    cur = c.execute(
                         "UPDATE reservation SET front_since_ts=? WHERE id=?",
                         (now.isoformat(timespec="seconds"), w["id"]),
                     )
+                    if cur.rowcount:
+                        did_mutate = True
                 if (w["id"] not in startable_ids) and (w["front_since_ts"] is not None):
-                    c.execute(
+                    cur = c.execute(
                         "UPDATE reservation SET front_since_ts=NULL WHERE id=?",
                         (w["id"],),
                     )
+                    if cur.rowcount:
+                        did_mutate = True
 
             # re-read after updates
             rows2 = c.execute(
@@ -87,6 +94,15 @@ def home():
                     (start + timedelta(minutes=r["duration_min"])) if started else None
                 )
                 grace_end = (end + timedelta(minutes=30)) if started else None
+                front_since_str = r["front_since_ts"]
+                front_since_dt = (
+                    datetime.fromisoformat(front_since_str) if front_since_str else None
+                )
+                end_ms = int(end.timestamp() * 1000) if end else None
+                grace_ms = int(grace_end.timestamp() * 1000) if grace_end else None
+                front_since_ms = (
+                    int(front_since_dt.timestamp() * 1000) if front_since_dt else None
+                )
                 remarks = (r["remarks"] or "").strip()
                 q.append(
                     {
@@ -96,16 +112,32 @@ def home():
                         "start": start,
                         "end": end,
                         "grace_end": grace_end,
+                        "end_ms": end_ms,
+                        "grace_end_ms": grace_ms,
                         "finished": r["finished"],
                         "front_since": r["front_since_ts"]
                         if r["front_since_ts"]
                         else "",
+                        "front_since_ms": front_since_ms,
                         "has_remarks": bool(remarks),
                         "remarks": remarks,
                     }
                 )
             queues[m["id"]] = q
             startable_map[m["id"]] = startable_ids
+
+        if did_mutate:
+            touch_last_update(c)
+
+        meta_row = c.execute(
+            "SELECT value FROM meta WHERE key='last_update_ms'"
+        ).fetchone()
+        try:
+            last_update_ms = (
+                int(meta_row["value"]) if meta_row and meta_row["value"] else server_now_ms
+            )
+        except (TypeError, ValueError):
+            last_update_ms = server_now_ms
 
     return render_template(
         "index.html",
@@ -114,6 +146,8 @@ def home():
         running_counts=running_counts,
         waiting_counts=waiting_counts,
         startable_map=startable_map,
+        server_now_ms=server_now_ms,
+        last_update_ms=last_update_ms,
     )
 
 
@@ -137,10 +171,12 @@ def add_machine():
     if name:
         with db() as c:
             try:
-                c.execute(
+                cur = c.execute(
                     "INSERT INTO machine(name, max_concurrent) VALUES(?,?)",
                     (name, max_concurrent),
                 )
+                if cur.rowcount:
+                    touch_last_update(c)
             except Exception:
                 pass
     return redirect(url_for("laundry.home"))
@@ -149,8 +185,14 @@ def add_machine():
 @bp.post("/machines/delete/<int:machine_id>")
 def delete_machine(machine_id):
     with db() as c:
-        c.execute("DELETE FROM reservation WHERE machine_id=?", (machine_id,))
-        c.execute("DELETE FROM machine WHERE id=?", (machine_id,))
+        res_deleted = c.execute(
+            "DELETE FROM reservation WHERE machine_id=?", (machine_id,)
+        ).rowcount
+        mach_deleted = c.execute(
+            "DELETE FROM machine WHERE id=?", (machine_id,)
+        ).rowcount
+        if res_deleted or mach_deleted:
+            touch_last_update(c)
     return redirect(url_for("laundry.home"))
 
 
@@ -163,13 +205,15 @@ def enqueue(machine_id):
     if not user:
         return redirect(url_for("laundry.home"))
     with db() as c:
-        c.execute(
+        cur = c.execute(
             """INSERT INTO reservation(machine_id,user,finished)
                      VALUES(?,?,0)""",
             (machine_id, user),
         )
         m = c.execute("SELECT name FROM machine WHERE id=?", (machine_id,)).fetchone()
         log_op_tx(c, user, "enqueue", m["name"], "joined queue")
+        if cur.rowcount:
+            touch_last_update(c)
     return redirect(url_for("laundry.home"))
 
 
@@ -266,7 +310,7 @@ def start_job(res_id):
         if r["start_ts"] is not None or res_id not in allowed_ids:
             return redirect(url_for("laundry.home"))
 
-        c.execute(
+        cur = c.execute(
             "UPDATE reservation SET start_ts=?, duration_min=?, front_since_ts=NULL, remarks=? WHERE id=?",
             (now_iso, total, remarks, res_id),
         )
@@ -275,6 +319,8 @@ def start_job(res_id):
         if remarks:
             detail += f"; remarks={remarks}"
         log_op_tx(c, r["user"], "start", r["mname"], detail)
+        if cur.rowcount:
+            touch_last_update(c)
 
     return redirect(url_for("laundry.home"))
 
@@ -292,8 +338,10 @@ def finish_res(res_id):
         ).fetchone()
         if not r:
             return redirect(url_for("laundry.home"))
-        c.execute("UPDATE reservation SET finished=1 WHERE id=?", (res_id,))
+        cur = c.execute("UPDATE reservation SET finished=1 WHERE id=?", (res_id,))
         log_op_tx(c, r["user"], "finish", r["mname"], "marked done")
+        if cur.rowcount:
+            touch_last_update(c)
     return redirect(url_for("laundry.home"))
 
 
@@ -312,8 +360,10 @@ def cancel_res(res_id):
             return redirect(url_for("laundry.home"))
         if r["start_ts"] is not None:
             return redirect(url_for("laundry.home"))
-        c.execute("DELETE FROM reservation WHERE id=?", (res_id,))
+        cur = c.execute("DELETE FROM reservation WHERE id=?", (res_id,))
         log_op_tx(c, r["user"], "cancel", r["mname"], "cancelled before start")
+        if cur.rowcount:
+            touch_last_update(c)
     return redirect(url_for("laundry.home"))
 
 
@@ -336,4 +386,26 @@ def logs_page():
         ).fetchall()
     return render_template(
         "logs.html", logs=logs, since_human=since.strftime("%Y-%m-%d %H:%M:%S")
+    )
+
+
+@bp.get("/sync-state")
+def sync_state():
+    now = datetime.now()
+    server_now_ms = int(now.timestamp() * 1000)
+    with db() as c:
+        meta_row = c.execute(
+            "SELECT value FROM meta WHERE key='last_update_ms'"
+        ).fetchone()
+    try:
+        last_update_ms = (
+            int(meta_row["value"]) if meta_row and meta_row["value"] else server_now_ms
+        )
+    except (TypeError, ValueError):
+        last_update_ms = server_now_ms
+    return jsonify(
+        {
+            "server_now_ms": server_now_ms,
+            "last_update_ms": last_update_ms,
+        }
     )

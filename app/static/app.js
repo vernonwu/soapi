@@ -9,20 +9,34 @@ function fmt(sec) {
   return (sign < 0 ? '-' : '') + core;
 }
 
+const meta = document.getElementById('server-meta');
+const serverNowMs = meta ? Number(meta.dataset.serverNowMs) : Date.now();
+let clockOffsetMs = Number.isFinite(serverNowMs) ? serverNowMs - Date.now() : 0;
+let latestUpdateMs = meta ? Number(meta.dataset.lastUpdateMs) : NaN;
+if (!Number.isFinite(latestUpdateMs)) {
+  latestUpdateMs = serverNowMs;
+}
+
 function tick() {
-  const nowMs = Date.now();
+  const nowMs = Date.now() + clockOffsetMs;
 
   document.querySelectorAll('.idle').forEach(span => {
-    const iso = span.dataset.frontsince;
-    if (!iso) { span.textContent = '00:00:00'; return; }
-    const t0 = new Date(iso).getTime();
+    const raw = span.dataset.frontSinceMs;
+    const t0 = raw ? Number(raw) : NaN;
+    if (!Number.isFinite(t0)) { span.textContent = '00:00:00'; return; }
     const elapsed = Math.round((nowMs - t0) / 1000);
     span.textContent = fmt(Math.max(0, elapsed));
   });
 
   document.querySelectorAll('.runline').forEach(el => {
-    const endMs = new Date(el.dataset.end).getTime();
-    const graceMs = new Date(el.dataset.grace).getTime();
+    const endMsRaw = el.dataset.endMs;
+    const graceMsRaw = el.dataset.graceMs;
+    const endMs = endMsRaw ? Number(endMsRaw) : NaN;
+    const graceMs = graceMsRaw ? Number(graceMsRaw) : NaN;
+    if (!Number.isFinite(endMs) || !Number.isFinite(graceMs)) {
+      el.textContent = '--:--';
+      return;
+    }
     const badge = el.closest('li').querySelector('.state-badge');
 
     let text = '';
@@ -45,4 +59,35 @@ function tick() {
     el.textContent = text;
   });
 }
-tick(); setInterval(tick, 1000);
+
+async function pollUpdates() {
+  try {
+    const resp = await fetch('/sync-state', { cache: 'no-store' });
+    if (!resp.ok) {
+      return;
+    }
+    const data = await resp.json();
+    if (Number.isFinite(data.server_now_ms)) {
+      clockOffsetMs = data.server_now_ms - Date.now();
+    }
+    if (Number.isFinite(data.last_update_ms)) {
+      if (data.last_update_ms > latestUpdateMs) {
+        window.location.reload();
+        return;
+      }
+      latestUpdateMs = Math.max(latestUpdateMs, data.last_update_ms);
+    }
+  } catch (err) {
+    // swallow network errors; next poll will retry
+  }
+}
+
+tick();
+setInterval(tick, 1000);
+setTimeout(pollUpdates, 1500);
+setInterval(pollUpdates, 3000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    pollUpdates();
+  }
+});

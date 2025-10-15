@@ -1,4 +1,5 @@
 import sqlite3
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -48,6 +49,11 @@ def ensure_schema(db_path: str):
         if "machine" not in lgcols:
             c.execute("ALTER TABLE op_log ADD COLUMN machine TEXT")
 
+        c.execute(
+            "INSERT OR IGNORE INTO meta(key, value) VALUES(?, ?)",
+            ("last_update_ms", str(int(time.time() * 1000))),
+        )
+
 
 def log_op_tx(conn, user: str, op: str, machine: str, detail: str):
     conn.execute(
@@ -59,4 +65,14 @@ def log_op_tx(conn, user: str, op: str, machine: str, detail: str):
             op,
             detail,
         ),
+    )
+
+
+def touch_last_update(conn):
+    conn.execute(
+        """
+        INSERT INTO meta(key, value) VALUES(?, ?)
+        ON CONFLICT(key) DO UPDATE SET value=excluded.value
+        """,
+        ("last_update_ms", str(int(time.time() * 1000))),
     )

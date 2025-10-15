@@ -54,7 +54,7 @@ The app binds to 0.0.0.0 by default, so any device on your local Wi-Fi can join 
 python run.py
 ```
 
-Find your LAN IP (e.g. 123.456.7.89) and access the app at `http://123.456.7.89:8000`.
+Find your LAN IP (e.g. 123.456.7.89) and access the app at `http://123.456.7.89:13013`.
 
 ### Option 2: Using Docker
 

@@ -57,6 +57,8 @@
   .delbtn:hover{background:#fecaca}
 </style>
 
+<div id="server-meta" data-server-now-ms="{{ server_now_ms }}" data-last-update-ms="{{ last_update_ms }}" hidden></div>
+
 <div class="container">
   <header>
     <h1>House Laundry Queue</h1>
@@ -111,15 +113,15 @@
                 <div class="mono">
                   Time remaining:
                   <span class="runline"
-                        data-end="{{ r['end'].isoformat() }}"
-                        data-grace="{{ r['grace_end'].isoformat() }}"></span>
+                        data-end-ms="{{ r['end_ms'] }}"
+                        data-grace-ms="{{ r['grace_end_ms'] }}"></span>
                 </div>
               {% endif %}
             </div>
 
             <div class="controls">
               {% if (not r['started']) and (r['id'] in startable_ids) %}
-                <span class="mono muted">Idle: <span class="idle" data-frontsince="{{ r['front_since'] }}"></span></span>
+                <span class="mono muted">Idle: <span class="idle" data-front-since-ms="{{ r['front_since_ms'] if r['front_since_ms'] is not none else '' }}"></span></span>
                 <form method="GET" action="{{ url_for('laundry.start_form', res_id=r['id']) }}">
                   <button>Start</button>
                 </form>

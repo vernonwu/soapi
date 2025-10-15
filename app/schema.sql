@@ -23,3 +23,8 @@ CREATE TABLE IF NOT EXISTS op_log(
   op TEXT NOT NULL,            -- enqueue/start/finish/cancel
   detail TEXT NOT NULL         -- extra message
 );
+
+CREATE TABLE IF NOT EXISTS meta(
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
