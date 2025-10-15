@@ -25,6 +25,12 @@
   input:focus{outline:none;border-color:var(--primary)}
   button{background:#fff;cursor:pointer}
   button:hover{border-color:var(--primary)}
+  button:disabled{
+    opacity:.5;
+    cursor:not-allowed;
+    border-color:var(--border);
+    color:var(--muted);
+  }
   ol{padding-left:20px;margin:10px 0}
   li{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 0;border-bottom:1px dashed var(--border)}
   li:last-child{border-bottom:none}
@@ -78,12 +84,16 @@
       </form>
 
       <h2>{{ m['name'] }}</h2>
-      <div class="cap">Capacity: {{ m['max_concurrent'] }} • Running: {{ running_counts[m['id']] }} • Waiting: {{ waiting_counts[m['id']] }}</div>
+      {% set queue_full = queue_full_map[m['id']] %}
+      <div class="cap">Capacity: {{ m['max_concurrent'] }} • Running: {{ running_counts[m['id']] }} • Waiting: {{ waiting_counts[m['id']] }} • Max queue: {{ m['max_queue'] }}</div>
 
       <form method="POST" action="{{ url_for('laundry.enqueue', machine_id=m['id']) }}">
         <input name="user" placeholder="Your name" required>
-        <button>Add to queue</button>
+        <button {% if queue_full %}disabled title="Queue is full (limit {{ m['max_queue'] }})"{% endif %}>Add to queue</button>
       </form>
+      {% if queue_full %}
+        <div class="muted" style="font-size:12px;">Queue full (limit {{ m['max_queue'] }} waiting).</div>
+      {% endif %}
 
       <ol>
         {% set startable_ids = startable_map[m['id']] %}

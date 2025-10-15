@@ -38,6 +38,10 @@ def ensure_schema(db_path: str):
             c.execute(
                 "ALTER TABLE machine ADD COLUMN max_concurrent INTEGER NOT NULL DEFAULT 1"
             )
+        if "max_queue" not in mcols:
+            c.execute(
+                "ALTER TABLE machine ADD COLUMN max_queue INTEGER NOT NULL DEFAULT 10"
+            )
 
         rcols = cols("reservation")
         if "front_since_ts" not in rcols:

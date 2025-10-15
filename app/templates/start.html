@@ -32,6 +32,10 @@
         <label>Max concurrent users</label>
         <input type="number" name="max_concurrent" min="1" value="1" required>
       </div>
+      <div class="field">
+        <label>Max waiting queue</label>
+        <input type="number" name="max_queue" min="0" value="10" required>
+      </div>
       <div class="row">
         <button class="btn">Add</button>
         <a class="btn cancel" href="{{ url_for('laundry.home') }}">Cancel</a>

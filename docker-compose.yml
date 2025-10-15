@@ -6,11 +6,11 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "13013:13013"
     volumes:
       - .:/usr/src/app
     environment:
       - FLASK_ENV=development
       - FLASK_RUN_HOST=0.0.0.0
-      - FLASK_RUN_PORT=8000
+      - FLASK_RUN_PORT=13013
     restart: always

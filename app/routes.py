@@ -28,6 +28,7 @@ def home():
         running_counts = {}
         waiting_counts = {}
         startable_map = {}
+        queue_full_map = {}
         did_mutate = False
 
         now = datetime.now()
@@ -54,6 +55,16 @@ def home():
             cap = m["max_concurrent"] if "max_concurrent" in m.keys() else 1
             slots = max(0, cap - len(running))
             startable_ids = set([w["id"] for w in waiting[:slots]])
+            max_queue = None
+            if "max_queue" in m.keys():
+                mq = m["max_queue"]
+                try:
+                    max_queue = int(mq) if mq is not None else None
+                except (TypeError, ValueError):
+                    max_queue = None
+            queue_full_map[m["id"]] = (
+                max_queue is not None and max_queue >= 0 and len(waiting) >= max_queue
+            )
 
             # maintain front_since_ts
             for w in waiting:
@@ -146,6 +157,7 @@ def home():
         running_counts=running_counts,
         waiting_counts=waiting_counts,
         startable_map=startable_map,
+        queue_full_map=queue_full_map,
         server_now_ms=server_now_ms,
         last_update_ms=last_update_ms,
     )
@@ -166,14 +178,20 @@ def add_machine():
         max_concurrent = int(request.form.get("max_concurrent", "1"))
     except ValueError:
         max_concurrent = 1
+    try:
+        max_queue = int(request.form.get("max_queue", "10"))
+    except ValueError:
+        max_queue = 10
     if max_concurrent < 1:
         max_concurrent = 1
+    if max_queue < 0:
+        max_queue = 0
     if name:
         with db() as c:
             try:
                 cur = c.execute(
-                    "INSERT INTO machine(name, max_concurrent) VALUES(?,?)",
-                    (name, max_concurrent),
+                    "INSERT INTO machine(name, max_concurrent, max_queue) VALUES(?,?,?)",
+                    (name, max_concurrent, max_queue),
                 )
                 if cur.rowcount:
                     touch_last_update(c)
@@ -205,13 +223,35 @@ def enqueue(machine_id):
     if not user:
         return redirect(url_for("laundry.home"))
     with db() as c:
+        machine_row = c.execute(
+            "SELECT name, max_queue FROM machine WHERE id=?", (machine_id,)
+        ).fetchone()
+        if not machine_row:
+            return redirect(url_for("laundry.home"))
+        max_queue = machine_row["max_queue"]
+        try:
+            max_queue_int = int(max_queue) if max_queue is not None else None
+        except (TypeError, ValueError):
+            max_queue_int = None
+        waiting_count = c.execute(
+            """
+            SELECT COUNT(*) AS cnt FROM reservation
+            WHERE machine_id=? AND finished=0 AND start_ts IS NULL
+            """,
+            (machine_id,),
+        ).fetchone()["cnt"]
+        if (
+            max_queue_int is not None
+            and max_queue_int >= 0
+            and waiting_count >= max_queue_int
+        ):
+            return redirect(url_for("laundry.home"))
         cur = c.execute(
             """INSERT INTO reservation(machine_id,user,finished)
                      VALUES(?,?,0)""",
             (machine_id, user),
         )
-        m = c.execute("SELECT name FROM machine WHERE id=?", (machine_id,)).fetchone()
-        log_op_tx(c, user, "enqueue", m["name"], "joined queue")
+        log_op_tx(c, user, "enqueue", machine_row["name"], "joined queue")
         if cur.rowcount:
             touch_last_update(c)
     return redirect(url_for("laundry.home"))
