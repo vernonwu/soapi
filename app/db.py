@@ -52,6 +52,11 @@ def ensure_schema(db_path: str):
 def log_op_tx(conn, user: str, op: str, machine: str, detail: str):
     conn.execute(
         "INSERT INTO op_log(ts,user,machine,op,detail) VALUES(?,?,?,?,?)",
-        (datetime.now().isoformat(timespec="seconds"), user, machine, op, detail),
+        (
+            datetime.now().isoformat(sep=" ", timespec="seconds"),
+            user,
+            machine,
+            op,
+            detail,
+        ),
     )
-
