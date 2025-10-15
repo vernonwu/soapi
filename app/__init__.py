@@ -1,5 +1,7 @@
 from flask import Flask
+
 from .db import ensure_schema
+
 
 def create_app():
     app = Flask(__name__)
@@ -11,6 +13,8 @@ def create_app():
 
     # register routes
     from .routes import bp
+
     app.register_blueprint(bp)
 
     return app
+

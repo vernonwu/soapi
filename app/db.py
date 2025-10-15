@@ -9,6 +9,7 @@ PRAGMAS = [
     "PRAGMA foreign_keys = ON",
 ]
 
+
 def connect(db_path: str):
     # autocommit; context managers still work
     conn = sqlite3.connect(db_path, timeout=10.0, isolation_level=None)
@@ -16,6 +17,7 @@ def connect(db_path: str):
     for p in PRAGMAS:
         conn.execute(p)
     return conn
+
 
 def ensure_schema(db_path: str):
     p = Path(__file__).with_name("schema.sql")
@@ -32,7 +34,9 @@ def ensure_schema(db_path: str):
 
         mcols = cols("machine")
         if "max_concurrent" not in mcols:
-            c.execute("ALTER TABLE machine ADD COLUMN max_concurrent INTEGER NOT NULL DEFAULT 1")
+            c.execute(
+                "ALTER TABLE machine ADD COLUMN max_concurrent INTEGER NOT NULL DEFAULT 1"
+            )
 
         rcols = cols("reservation")
         if "front_since_ts" not in rcols:
@@ -44,8 +48,10 @@ def ensure_schema(db_path: str):
         if "machine" not in lgcols:
             c.execute("ALTER TABLE op_log ADD COLUMN machine TEXT")
 
+
 def log_op_tx(conn, user: str, op: str, machine: str, detail: str):
     conn.execute(
         "INSERT INTO op_log(ts,user,machine,op,detail) VALUES(?,?,?,?,?)",
-        (datetime.now().isoformat(timespec="seconds"), user, machine, op, detail)
+        (datetime.now().isoformat(timespec="seconds"), user, machine, op, detail),
     )
+
