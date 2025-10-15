@@ -1,0 +1,63 @@
+<!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
+{% if is_add_machine %}
+  <title>Add machine</title>
+{% else %}
+  <title>Start Job</title>
+{% endif %}
+<style>
+  :root{--fg:#1f2937; --muted:#6b7280; --primary:#2563eb; --border:#e5e7eb; --bg:#f8fafc;}
+  body{font-family:system-ui,Segoe UI,Arial;margin:0;background:var(--bg);color:var(--fg)}
+  .container{max-width:720px;margin:24px auto;padding:0 16px}
+  h2{margin:0 0 12px 0}
+  form{display:flex;gap:12px;flex-wrap:wrap}
+  .field{display:flex;flex-direction:column;gap:6px}
+  input,button,textarea{padding:10px 12px;font-size:14px;border:1px solid var(--border);border-radius:10px}
+  input:focus,textarea:focus{outline:none;border-color:var(--primary)}
+  .full{flex:1 1 100%}
+  .row{display:flex;gap:12px;flex-wrap:wrap;width:100%}
+  .btn{padding:10px 14px;border-radius:10px;border:1px solid var(--primary);background:var(--primary);color:#fff;cursor:pointer}
+  .btn.cancel{background:transparent;color:var(--primary)}
+  a{display:inline-block;padding:10px 14px;border:1px solid var(--primary);border-radius:10px;color:var(--primary);text-decoration:none}
+</style>
+
+<div class="container">
+  {% if is_add_machine %}
+    <h2>Add machine</h2>
+    <form method="POST" action="{{ url_for('laundry.add_machine') }}">
+      <div class="field">
+        <label>Name</label>
+        <input name="name" placeholder="e.g. Washer A" required>
+      </div>
+      <div class="field">
+        <label>Max concurrent users</label>
+        <input type="number" name="max_concurrent" min="1" value="1" required>
+      </div>
+      <div class="row">
+        <button class="btn">Add</button>
+        <a class="btn cancel" href="{{ url_for('laundry.home') }}">Cancel</a>
+      </div>
+    </form>
+  {% else %}
+    <h2>Start job for {{ user }} ({{ machine }})</h2>
+    <form method="POST" action="{{ url_for('laundry.start_job', res_id=res_id) }}">
+      <div class="row">
+        <div class="field">
+          <label>Hours</label>
+          <input type="number" name="hours" min="0" value="0" required>
+        </div>
+        <div class="field">
+          <label>Minutes</label>
+          <input type="number" name="minutes" min="0" max="59" value="45" required>
+        </div>
+      </div>
+      <div class="field full">
+        <label>Remarks (optional)</label>
+        <textarea name="remarks" placeholder="Detergent in drawer, please switch to dryer, etc." rows="3"></textarea>
+      </div>
+      <div class="row">
+        <button class="btn">Confirm & Start</button>
+        <a class="btn cancel" href="{{ url_for('laundry.home') }}">Cancel</a>
+      </div>
+    </form>
+  {% endif %}
+</div>

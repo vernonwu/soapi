@@ -1,0 +1,42 @@
+<!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
+<title>Operation Logs (last 7 days)</title>
+<style>
+  :root{--fg:#1f2937; --muted:#6b7280; --primary:#2563eb; --border:#e5e7eb; --bg:#f8fafc;}
+  body{font-family:system-ui,Segoe UI,Arial;margin:0;background:var(--bg);color:var(--fg)}
+  .container{max-width:1000px;margin:24px auto;padding:0 16px}
+  h2{margin:0 0 8px 0}
+  .subtitle{color:var(--muted);margin-bottom:12px}
+  .actions{margin-bottom:12px}
+  .btn{padding:10px 14px;border:1px solid var(--primary);border-radius:10px;text-decoration:none;color:#fff;background:var(--primary)}
+  .btn:hover{opacity:.95}
+  table{width:100%;border-collapse:separate;border-spacing:0 8px}
+  th{font-size:12px;color:var(--muted);text-align:left;padding:0 10px}
+  td{background:#fff;border:1px solid var(--border);padding:10px;border-radius:10px}
+  tr td:first-child{border-top-right-radius:0;border-bottom-right-radius:0}
+  tr td:last-child{border-top-left-radius:0;border-bottom-left-radius:0}
+  .mono{font-variant-numeric: tabular-nums}
+</style>
+<div class="container">
+  <h2>Operation Logs</h2>
+  <div class="subtitle">Showing records from the last 7 days (since {{ since_human }})</div>
+  <div class="actions"><a class="btn" href="{{ url_for('laundry.home') }}">Back</a></div>
+
+  <table>
+    <thead>
+      <tr><th>Time</th><th>User</th><th>Machine</th><th>Operation</th><th>Detail</th></tr>
+    </thead>
+    <tbody>
+      {% for row in logs %}
+        <tr>
+          <td class="mono">{{ row['ts'] }}</td>
+          <td>{{ row['user'] }}</td>
+          <td>{{ row['machine'] or '-' }}</td>
+          <td>{{ row['op'] }}</td>
+          <td>{{ row['detail'] }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5">No logs in last 7 days.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
