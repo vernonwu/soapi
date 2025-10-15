@@ -21,9 +21,9 @@
   h2{margin:0 0 8px 0;font-size:18px}
   .cap{font-size:12px;color:var(--muted);margin-bottom:6px}
   form{display:inline-flex;gap:8px;flex-wrap:wrap;margin:8px 0}
-  input,button{padding:10px 12px;font-size:14px;border:1px solid var(--border);border-radius:10px}
+  input,button{padding:10px 12px;font-size:14px;border:1px solid var(--border);border-radius:10px;color:var(--fg)}
   input:focus{outline:none;border-color:var(--primary)}
-  button{background:#fff;cursor:pointer}
+  button{background:#fff;cursor:pointer;font-weight:400;font-family:inherit}
   button:hover{border-color:var(--primary)}
   button:disabled{
     opacity:.5;
@@ -32,14 +32,17 @@
     color:var(--muted);
   }
   ol{padding-left:20px;margin:10px 0}
-  li{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 0;border-bottom:1px dashed var(--border)}
+  li{padding:8px 0;border-bottom:1px dashed var(--border)}
   li:last-child{border-bottom:none}
-  .left{display:flex;flex-direction:column;gap:4px}
+  .item-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .item-main{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1}
+  .item-main .timing{display:flex;align-items:center;gap:4px;margin-left:12px}
+  .item-actions{display:flex;align-items:center;gap:8px}
+  .item-actions form{margin:0}
   .badge{font-size:12px;border:1px solid var(--border);border-radius:999px;padding:2px 10px;background:#f3f4f6}
   .badge[data-state="running"]{background:#e0f2fe;border-color:#bae6fd}
   .badge[data-state="awaiting"]{background:#ecfdf5;border-color:#bbf7d0}
   .badge[data-state="overdue"]{background:#fef2f2;border-color:#fecaca}
-  .controls{display:flex;gap:8px;align-items:center}
   .mono{font-variant-numeric: tabular-nums}
   .muted{color:var(--muted)}
   .danger{color:var(--red)}
@@ -99,53 +102,52 @@
         {% set startable_ids = startable_map[m['id']] %}
         {% for r in queues[m['id']] %}
           <li data-res-id="{{ r['id'] }}">
-            <div class="left">
-              <div>
+            <div class="item-row">
+              <div class="item-main">
                 <strong>{{ r['user'] }}</strong>
                 {% if r['started'] %}
                   <span class="badge state-badge" data-state="running">running</span>
-                  {% if r['has_remarks'] %}
-                    <button type="button" title="Remarks" onclick="alert(this.dataset.text)" data-text="{{ r['remarks']|e }}">💬</button>
-                  {% endif %}
                 {% else %}
                   {% if r['id'] in startable_ids %}
                     <span class="badge">front of queue</span>
                   {% else %}
                     <span class="badge">queueing…</span>
                   {% endif %}
-                  {% if r['has_remarks'] %}
-                    <button type="button" title="Remarks" onclick="alert(this.dataset.text)" data-text="{{ r['remarks']|e }}">💬</button>
-                  {% endif %}
+                {% endif %}
+                {% if r['has_remarks'] %}
+                  <button type="button" title="Remarks" onclick="alert(this.dataset.text)" data-text="{{ r['remarks']|e }}">💬</button>
+                {% endif %}
+                {% if r['started'] %}
+                  <span class="timing mono">
+                    Time remaining:
+                    <span class="runline"
+                          data-end-ms="{{ r['end_ms'] }}"
+                          data-grace-ms="{{ r['grace_end_ms'] }}"></span>
+                  </span>
+                {% elif (r['id'] in startable_ids) %}
+                  <span class="timing mono muted">
+                    Idle:
+                    <span class="idle" data-front-since-ms="{{ r['front_since_ms'] if r['front_since_ms'] is not none else '' }}"></span>
+                  </span>
                 {% endif %}
               </div>
-
-              {% if r['started'] %}
-                <div class="mono">
-                  Time remaining:
-                  <span class="runline"
-                        data-end-ms="{{ r['end_ms'] }}"
-                        data-grace-ms="{{ r['grace_end_ms'] }}"></span>
-                </div>
-              {% endif %}
-            </div>
-
-            <div class="controls">
-              {% if (not r['started']) and (r['id'] in startable_ids) %}
-                <span class="mono muted">Idle: <span class="idle" data-front-since-ms="{{ r['front_since_ms'] if r['front_since_ms'] is not none else '' }}"></span></span>
-                <form method="GET" action="{{ url_for('laundry.start_form', res_id=r['id']) }}">
-                  <button>Start</button>
-                </form>
-              {% endif %}
-              {% if (not r['started']) %}
-                <form method="POST" action="{{ url_for('laundry.cancel_res', res_id=r['id']) }}">
-                  <button type="submit">Cancel</button>
-                </form>
-              {% endif %}
-              {% if r['started'] and not r['finished'] %}
-                <form method="POST" action="{{ url_for('laundry.finish_res', res_id=r['id']) }}">
-                  <button>Done</button>
-                </form>
-              {% endif %}
+              <div class="item-actions">
+                {% if (not r['started']) and (r['id'] in startable_ids) %}
+                  <form method="GET" action="{{ url_for('laundry.start_form', res_id=r['id']) }}">
+                    <button>Start</button>
+                  </form>
+                {% endif %}
+                {% if (not r['started']) %}
+                  <form method="POST" action="{{ url_for('laundry.cancel_res', res_id=r['id']) }}">
+                    <button type="submit">Cancel</button>
+                  </form>
+                {% endif %}
+                {% if r['started'] and not r['finished'] %}
+                  <form method="POST" action="{{ url_for('laundry.finish_res', res_id=r['id']) }}">
+                    <button>Done</button>
+                  </form>
+                {% endif %}
+              </div>
             </div>
           </li>
         {% else %}

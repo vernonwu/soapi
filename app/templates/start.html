@@ -11,10 +11,11 @@
   h2{margin:0 0 12px 0}
   form{display:flex;gap:12px;flex-wrap:wrap}
   .field{display:flex;flex-direction:column;gap:6px}
-  input,button,textarea{padding:10px 12px;font-size:14px;border:1px solid var(--border);border-radius:10px}
+  input,button,textarea{padding:10px 12px;font-size:14px;border:1px solid var(--border);border-radius:10px;color:var(--fg);font-weight:400;font-family:inherit}
   input:focus,textarea:focus{outline:none;border-color:var(--primary)}
   .full{flex:1 1 100%}
-  .row{display:flex;gap:12px;flex-wrap:wrap;width:100%}
+.row{display:flex;gap:12px;flex-wrap:wrap;width:100%}
+.actions-row{justify-content:flex-end}
   .btn{padding:10px 14px;border-radius:10px;border:1px solid var(--primary);background:var(--primary);color:#fff;cursor:pointer}
   .btn.cancel{background:transparent;color:var(--primary)}
   a{display:inline-block;padding:10px 14px;border:1px solid var(--primary);border-radius:10px;color:var(--primary);text-decoration:none}
@@ -36,7 +37,7 @@
         <label>Max waiting queue</label>
         <input type="number" name="max_queue" min="0" value="10" required>
       </div>
-      <div class="row">
+      <div class="row actions-row">
         <button class="btn">Add</button>
         <a class="btn cancel" href="{{ url_for('laundry.home') }}">Cancel</a>
       </div>
@@ -58,7 +59,7 @@
         <label>Remarks (optional)</label>
         <textarea name="remarks" placeholder="Detergent in drawer, please switch to dryer, etc." rows="3"></textarea>
       </div>
-      <div class="row">
+      <div class="row actions-row">
         <button class="btn">Confirm & Start</button>
         <a class="btn cancel" href="{{ url_for('laundry.home') }}">Cancel</a>
       </div>
